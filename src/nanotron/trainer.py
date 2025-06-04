@@ -570,24 +570,24 @@ class DistributedTrainer:
                 # Training step
                 outputs, loss_avg, z_loss_avg = self.training_step(dataloader=self.current_dataloader)
 
-                # Update consumption tracking for current batch
-                if hasattr(self.current_base_dl, "dataset"):
-                    self.current_base_dl.dataset.update_consumption_metrics(
-                        start_idx=(self.iteration_step - 1)
-                        * self.global_batch_size,  # assumes we start from iteration_step=1
-                        end_idx=self.iteration_step * self.global_batch_size,
-                        sequence_length=self.sequence_length,
-                    )
+                # # Update consumption tracking for current batch
+                # if hasattr(self.current_base_dl, "dataset"):
+                #     self.current_base_dl.dataset.update_consumption_metrics(
+                #         start_idx=(self.iteration_step - 1)
+                #         * self.global_batch_size,  # assumes we start from iteration_step=1
+                #         end_idx=self.iteration_step * self.global_batch_size,
+                #         sequence_length=self.sequence_length,
+                #     )
 
-                # Training Logs
-                # Track consumed tokens for all dataset folders in current stage
-                if hasattr(self.current_base_dl, "dataset"):
-                    consumption_stats = self.current_base_dl.dataset.get_consumption_stats()
-                    current_stage = self.metadata.data_stages[self.metadata.last_stage_idx]
+                # # Training Logs
+                # # Track consumed tokens for all dataset folders in current stage
+                # if hasattr(self.current_base_dl, "dataset"):
+                #     consumption_stats = self.current_base_dl.dataset.get_consumption_stats()
+                #     current_stage = self.metadata.data_stages[self.metadata.last_stage_idx]
 
-                    # Update consumed tokens for all folders in the consumption stats
-                    for folder_path, stats in consumption_stats.items():
-                        current_stage.consumed_tokens_per_dataset_folder[folder_path] = stats["tokens"]
+                #     # Update consumed tokens for all folders in the consumption stats
+                #     for folder_path, stats in consumption_stats.items():
+                #         current_stage.consumed_tokens_per_dataset_folder[folder_path] = stats["tokens"]
 
                 # Original consumption tracking
                 self.metadata.consumed_train_samples += self.global_batch_size
@@ -771,6 +771,11 @@ class DistributedTrainer:
         lr = self.lr_scheduler.get_last_lr()[0]
         remaining_steps = self.config.tokens.train_steps - self.iteration_step
         eta_seconds = int(remaining_steps * (elapsed_time_per_iteration_ms / 1000))
+        # XXX
+        try:
+            loss_for_log = loss_avg.item()
+        except:
+            loss_for_log = -1
         basic_log_entries = [
             # LogItem("consumed_samples", self.consumed_train_samples, "human_format"),  # , "12d"),
             LogItem(
@@ -785,7 +790,7 @@ class DistributedTrainer:
                 "tokens_per_sec_per_gpu", tokens_per_sec / self.parallel_context.world_pg.size(), "human_format"
             ),  # , "1.6E"),
             LogItem("global_batch_size", self.config.global_batch_size_in_tokens, "human_format"),  # , "5d"),
-            LogItem("lm_loss", loss_avg.item(), "human_format"),  # , "1.6E"),
+            LogItem("lm_loss", loss_for_log, "human_format"),  # , "1.6E"),
             LogItem("lr", lr, "human_format"),  # , ".3E"),
             LogItem("model_tflops_per_gpu", model_tflops, "human_format"),  # , ".2f"),
             # LogItem("hardware_tflops_per_gpu", hardware_tflops, "human_format"),  # , ".2f"),
@@ -876,13 +881,13 @@ class DistributedTrainer:
             assert self.current_base_dl is not None, "current_base_dl should be defined"
 
             # Log consumption statistics
-            if hasattr(self.current_base_dl, "dataset"):
-                for dataset_name, stats in self.current_base_dl.dataset.get_consumption_stats().items():
-                    basic_log_entries.extend(
-                        [
-                            LogItem(f"dataloader/consumed_tokens/{dataset_name}", stats["tokens"], "human_format"),
-                        ]
-                    )
+            # if hasattr(self.current_base_dl, "dataset"):
+            #     for dataset_name, stats in self.current_base_dl.dataset.get_consumption_stats().items():
+            #         basic_log_entries.extend(
+            #             [
+            #                 LogItem(f"dataloader/consumed_tokens/{dataset_name}", stats["tokens"], "human_format"),
+            #             ]
+            #         )
 
         # WandB logging - determine if this rank should log to wandb
         should_log_to_wandb = wandb is not None and (
@@ -1175,7 +1180,11 @@ class DistributedTrainer:
 
     def pre_save_checkpoint(self) -> Path:
         # Check if eval_interval should be updated from file
-        eval_interval_file = self.config.lighteval.eval_interval_file
+        # XXx
+        if self.config.lighteval is None:
+            eval_interval_file = None
+        else:
+            eval_interval_file = self.config.lighteval.eval_interval_file
         if eval_interval_file is not None and Path(eval_interval_file).exists():
             try:
                 with open(eval_interval_file, "r") as f:

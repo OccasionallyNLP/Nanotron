@@ -1,7 +1,7 @@
 """
 Converts a nanotron model to HF format
 Command:
-    torchrun --nproc_per_node=1 convert_nanotron_to_hf.py --checkpoint_path=nanotron-path --save_path=hf-path
+    torchrun --nproc_per_node=1 -m examples.llama.convert_nanotron_to_hf --checkpoint_path ../checkpoints/1000 --save_path ../hf_checkpoints/1000 --tokenizer_name Qwen/Qwen3-8B
 """
 
 import json
@@ -20,6 +20,7 @@ from transformers import LlamaConfig as HFLlamaConfig
 from .convert_weights import get_config_mapping, get_weight_mapping, load_nanotron_model
 
 TEST_PROMPT = "What is the meaning of the word chutzpah?\nThe word chutzpah means"
+TEST_PROMPT_2 = "대한민국의 수도는 어디야?\n대한민국의 수도는"
 
 
 def _handle_attention_block(
@@ -155,7 +156,12 @@ def check_converted_model_generation(save_path: Path):
     model = LlamaForCausalLM.from_pretrained(save_path).cuda().bfloat16()
     out = model.generate(input_ids, max_new_tokens=100)
     print("Generation (converted): ", tokenizer.batch_decode(out))
-
+    
+    # FOR KOREAN
+    input_ids = tokenizer(TEST_PROMPT_2, return_tensors="pt")["input_ids"].cuda()
+    print("Inputs:", tokenizer.batch_decode(input_ids))
+    out = model.generate(input_ids, max_new_tokens=100)
+    print("Generation (converted): ", tokenizer.batch_decode(out))
 
 if __name__ == "__main__":
     parser = ArgumentParser(description="Convert Nanotron weights to HF format")

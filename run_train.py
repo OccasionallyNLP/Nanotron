@@ -78,7 +78,7 @@ def get_dataloader_from_data_stage(
     # First, we need to know which ranks to feed the dataloader to
     input_pp_rank, output_pp_rank = get_input_output_pp_ranks(model=trainer.model)
 
-    # Case 1: Dummy data generator
+    # Case 0: Dummy data generator
     if data.dataset is None:
         log_rank("Using dummy data generator", logger=logger, level=logging.INFO, rank=0)
         dataloader = dummy_infinite_data_generator(
@@ -290,7 +290,64 @@ def get_dataloader_from_data_stage(
         # dist.barrier()
 
     else:
-        raise ValueError(f"Unhandled case of `self.config.data.dataset`. Got: {data.dataset}")
+        # case 4
+        ## tokenized and groupd datasets.
+        # raise ValueError(f"Unhandled case of `self.config.data.dataset`. Got: {data.dataset}")
+        log_rank("Using `datasets` library", logger=logger, level=logging.INFO, rank=0)
+        tokenizer_path = trainer.config.tokenizer.tokenizer_name_or_path
+        log_rank(
+            f"Loading tokenizer from {tokenizer_path} and transformers/hf_hub versions {tf_version, hf_hub_version}",
+            logger=logger,
+            level=logging.INFO,
+            rank=0,
+        )
+
+        # We need to the 1st device to process dataset and cache it, then other devices load from cache
+        with main_rank_first(trainer.parallel_context.world_pg):
+            # TODO @nouamanetazi: this may timeout before 1st device finishes processing dataset. Can we have a ctxmanager to modify timeout?
+            # TODO: generalise to include  for validation/test splits
+
+            # We load the raw dataset
+            from datasets import interleave_datasets, load_from_disk
+            raw_datasets = []
+            probs = []
+            for tmp in data.dataset:
+                print(tmp)
+                raw_dataset = load_from_disk(tmp['name'])
+                print(len(raw_dataset)*2048)
+                prob = tmp['prob']
+                raw_datasets.append(raw_dataset)
+                probs.append(prob)
+            tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
+            tokenizer.padding_side = "left"
+            sequence_sep_tokens = [tokenizer.bos_token, tokenizer.eos_token, tokenizer.pad_token, tokenizer.unk_token]
+            train_dataset = interleave_datasets(raw_datasets, probabilities=probs, seed=data.seed)
+
+            # We load the processed dataset on the ranks requiring it
+            dataloader = get_train_dataloader(
+                train_dataset=train_dataset,
+                sequence_length=trainer.sequence_length,
+                parallel_context=trainer.parallel_context,
+                input_pp_rank=input_pp_rank,
+                output_pp_rank=output_pp_rank,
+                micro_batch_size=trainer.micro_batch_size,
+                consumed_train_samples=consumed_train_samples,
+                dataloader_num_workers=data.num_loading_workers,
+                seed_worker=data.seed,
+                dataloader_drop_last=True,
+                use_position_ids=isinstance(trainer.model_config, Qwen2Config),
+                sequence_sep_tokens=sequence_sep_tokens,  # Used to generate position ids
+            )
+
+            # Check if we have enough samples for train_steps
+            total_tokens_dataset = len(dataloader.dataset) * trainer.sequence_length
+            num_tokens_needed_for_training = (
+                num_remaining_train_steps * trainer.global_batch_size * trainer.sequence_length
+            )
+            assert num_tokens_needed_for_training <= total_tokens_dataset, (
+                f"Dataset is too small for steps ({total_tokens_dataset} < {num_tokens_needed_for_training}), "
+                f"Try train_steps<={len(dataloader.dataset) // trainer.global_batch_size + trainer.iteration_step}"
+            )
 
     if sanity_check_dataloader_interval is not None:
         sanity_check_dataloader(

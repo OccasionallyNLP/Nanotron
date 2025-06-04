@@ -209,7 +209,7 @@ class DataArgs:
     """Arguments related to the data and data files processing"""
 
     dataset: Optional[
-        Union[PretrainDatasetsArgs, NanosetDatasetsArgs, SFTDatasetsArgs]
+        Union[PretrainDatasetsArgs, NanosetDatasetsArgs, SFTDatasetsArgs, List[dict]]
     ]  # If None we use dummy_infinite_data_generator
     seed: Optional[int]
     num_loading_workers: Optional[int] = 1
