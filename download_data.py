@@ -9,6 +9,6 @@ os.environ["HF_DATASETS_CACHE"] = "/nfsdata/languageAI/users/ocw/data/datasets_c
 
 # (필요하다면) transformers 모델·토크나이저 캐시까지 한꺼번에 바꾸고 싶다면
 os.environ["TRANSFORMERS_CACHE"] = "/nfsdata/languageAI/users/ocw/data/transformers_cache"
-data = load_dataset("HuggingFaceFW/fineweb", "sample-100BT", cache_dir = '/nfsdata/languageAI/users/ocw/data/datasets_cache')
-data.save_to_disk('/nfsdata/languageAI/users/ocw/data/fineweb-100BT')
+data = load_dataset("HuggingFaceFW/fineweb", "sample-350BT", cache_dir = '/nfsdata/languageAI/users/ocw/data/datasets_cache')
+data.save_to_disk('/nfsdata/languageAI/users/ocw/data/fineweb-350BT')
 # data = load_dataset("HuggingFaceFW/fineweb", name="sample-99BT", cache_dir = './data')

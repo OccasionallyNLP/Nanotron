@@ -22,7 +22,7 @@ import torch.utils.data
 from torch.utils.data import BatchSampler
 from torch.utils.data.distributed import DistributedSampler
 from transformers.trainer_pt_utils import DistributedSamplerWithLoop
-
+from tqdm import tqdm
 from nanotron import logging
 from nanotron.logging import log_rank
 
@@ -48,7 +48,7 @@ class SkipBatchSampler(BatchSampler):
         self.skip_batches = skip_batches // dp_size
 
     def __iter__(self):
-        for index, samples in enumerate(self.batch_sampler):
+        for index, samples in enumerate(tqdm(self.batch_sampler,desc='skip')):
             if index >= self.skip_batches:
                 yield samples
 

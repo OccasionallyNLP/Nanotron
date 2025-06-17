@@ -173,7 +173,8 @@ if __name__ == '__main__':
                 else:
                     cnt+=1
                     tmp = []
-                    tmp_dataset.cleanup_cache_files()
+                    if tmp_dataset is not None:
+                        tmp_dataset.cleanup_cache_files()
                     tmp_dataset = None
                 # reset
             tmp.append(i)

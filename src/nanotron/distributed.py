@@ -15,7 +15,7 @@ torch_version_above_1_13 = version.parse(torch.__version__) >= version.parse("1.
 Work = dist.Work if torch_version_above_1_13 else dist._Work
 
 # Note: When debugging communication hangs, try decreasing this timeout.
-default_pg_timeout = datetime.timedelta(minutes=20)
+default_pg_timeout = datetime.timedelta(minutes=120)
 
 
 def new_group(  # pylint: disable=function-redefined

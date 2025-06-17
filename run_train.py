@@ -312,17 +312,17 @@ def get_dataloader_from_data_stage(
             raw_datasets = []
             probs = []
             for tmp in data.dataset:
-                print(tmp)
                 raw_dataset = load_from_disk(tmp['name'])
-                print(len(raw_dataset)*2048)
                 prob = tmp['prob']
                 raw_datasets.append(raw_dataset)
                 probs.append(prob)
             tokenizer = AutoTokenizer.from_pretrained(tokenizer_path)
             tokenizer.padding_side = "left"
             sequence_sep_tokens = [tokenizer.bos_token, tokenizer.eos_token, tokenizer.pad_token, tokenizer.unk_token]
+            # normalize
+            probs = [i/sum(probs) for i in probs]
             train_dataset = interleave_datasets(raw_datasets, probabilities=probs, seed=data.seed)
-
+            print(len(train_dataset)*2048)
             # We load the processed dataset on the ranks requiring it
             dataloader = get_train_dataloader(
                 train_dataset=train_dataset,

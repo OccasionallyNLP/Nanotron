@@ -1,0 +1,1 @@
+CUDA_DEVICE_MAX_CONNECTIONS=1 torchrun --nproc_per_node=4 run_train_ok_2.py --config-file examples/config_test.yaml
